@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { menuData, GROUPS, LOGO, FOOD_IMAGES, CAT_IMG } from "@/lib/menu-data";
 import { useCart, CartProvider } from "@/lib/cart-context";
+import { createOrder } from "@/lib/actions";
 import {
   Sun, Utensils, Wheat, Fish, Beef, Drumstick, Sandwich, Pizza,
   GlassWater, Snowflake, Coffee, Wine, Salad, Soup, Search, X,
-  ShoppingCart, Plus, Minus, Trash2, ExternalLink, QrCode, Check
+  ShoppingCart, Plus, Minus, Trash2, ExternalLink, QrCode, Check, Loader2
 } from "lucide-react";
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -37,6 +38,8 @@ function MenuContent() {
   const [qrModal, setQrModal] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [orderSubmitted, setOrderSubmitted] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [orderNotes, setOrderNotes] = useState("");
   
   const { items, addItem, updateQuantity, removeItem, clearCart, total, itemCount, tableNumber, setTableNumber } = useCart();
 
@@ -73,12 +76,34 @@ function MenuContent() {
       alert("Please enter your table number");
       return;
     }
-    setOrderSubmitted(true);
-    setTimeout(() => {
-      clearCart();
-      setCartOpen(false);
-      setOrderSubmitted(false);
-    }, 3000);
+    
+    startTransition(async () => {
+      const orderData = {
+        table_number: tableNumber,
+        total_amount: total,
+        notes: orderNotes || undefined,
+        items: items.map(item => ({
+          item_name: item.name,
+          item_price: item.price,
+          quantity: item.quantity,
+          category: item.category
+        }))
+      };
+      
+      const result = await createOrder(orderData);
+      
+      if (result.success) {
+        setOrderSubmitted(true);
+        setTimeout(() => {
+          clearCart();
+          setCartOpen(false);
+          setOrderSubmitted(false);
+          setOrderNotes("");
+        }, 3000);
+      } else {
+        alert("Failed to submit order: " + result.error);
+      }
+    });
   };
 
   return (
@@ -419,6 +444,20 @@ function MenuContent() {
                       </div>
                     </div>
                   ))}
+
+                  {/* Order Notes */}
+                  <div className="bg-[#c39c4b]/5 border border-[#c39c4b]/20 rounded-md p-3 mt-4">
+                    <label className="block text-[10px] text-[#c39c4b]/70 uppercase tracking-[0.1em] mb-2 font-semibold">
+                      Special Instructions (Optional)
+                    </label>
+                    <textarea
+                      value={orderNotes}
+                      onChange={(e) => setOrderNotes(e.target.value)}
+                      placeholder="Any special requests or dietary notes..."
+                      rows={2}
+                      className="w-full bg-[#060308] border border-[#c39c4b]/30 rounded-sm px-3 py-2 text-[#e8d9b5] text-sm outline-none focus:border-[#c39c4b]/50 placeholder:text-[#e8d9b5]/20 resize-none"
+                    />
+                  </div>
                 </div>
 
                 <div className="p-4 border-t border-[#c39c4b]/10 bg-[#09060c]">
@@ -428,9 +467,17 @@ function MenuContent() {
                   </div>
                   <button
                     onClick={handleSubmitOrder}
-                    className="w-full bg-[#c39c4b] text-[#060308] py-3.5 rounded-md font-bold tracking-wide hover:bg-[#d4ad5c] transition-all"
+                    disabled={isPending}
+                    className="w-full bg-[#c39c4b] text-[#060308] py-3.5 rounded-md font-bold tracking-wide hover:bg-[#d4ad5c] transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    Submit Order
+                    {isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Sending Order...
+                      </>
+                    ) : (
+                      "Submit Order"
+                    )}
                   </button>
                   <button
                     onClick={clearCart}
