@@ -2,7 +2,7 @@ import { updateSession } from '@/lib/supabase/middleware'
 import { type NextRequest, NextResponse } from 'next/server'
 
 // Routes that require authentication
-const protectedRoutes = ['/admin', '/kitchen', '/menu-management']
+const protectedRoutes = ['/admin', '/kitchen', '/menu-management', '/cashier', '/bar']
 
 export async function middleware(request: NextRequest) {
   const response = await updateSession(request)
