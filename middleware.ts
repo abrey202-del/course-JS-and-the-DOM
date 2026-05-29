@@ -2,9 +2,9 @@ import { updateSession } from '@/lib/supabase/middleware'
 import { type NextRequest, NextResponse } from 'next/server'
 
 // Routes that require authentication
-// Bar and Kitchen are open access - staff can use cashier login if needed
-// Inventory, Analytics and Owner dashboard require admin access
-const protectedRoutes = ['/admin', '/menu-management', '/cashier', '/inventory', '/analytics', '/owner']
+// TEMPORARILY DISABLED FOR PREVIEW - uncomment for production:
+// const protectedRoutes = ['/admin', '/menu-management', '/cashier', '/inventory', '/analytics', '/owner']
+const protectedRoutes: string[] = []
 
 export async function middleware(request: NextRequest) {
   const response = await updateSession(request)
