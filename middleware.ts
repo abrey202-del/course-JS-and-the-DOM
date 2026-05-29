@@ -3,7 +3,8 @@ import { type NextRequest, NextResponse } from 'next/server'
 
 // Routes that require authentication
 // Bar and Kitchen are open access - staff can use cashier login if needed
-const protectedRoutes = ['/admin', '/menu-management', '/cashier']
+// Inventory and Analytics require cashier/admin access
+const protectedRoutes = ['/admin', '/menu-management', '/cashier', '/inventory', '/analytics']
 
 export async function middleware(request: NextRequest) {
   const response = await updateSession(request)

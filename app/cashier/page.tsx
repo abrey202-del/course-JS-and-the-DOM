@@ -8,8 +8,10 @@ import { useRouter } from "next/navigation";
 import { 
   Clock, CheckCircle2, Bell, Timer, RefreshCw, DollarSign, 
   ShoppingBag, XCircle, ChefHat, Wine, LogOut, Volume2, VolumeX,
-  BellRing, Users, ArrowRight, AlertCircle
+  BellRing, Users, ArrowRight, AlertCircle, QrCode, Plus, Package, BarChart3, X
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+import { menuData } from "@/lib/menu-data";
 
 type OrderStatus = 'pending' | 'preparing' | 'ready' | 'served' | 'cancelled';
 
@@ -40,6 +42,11 @@ export default function CashierDashboard() {
   const [loading, setLoading] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [lastOrderCount, setLastOrderCount] = useState(0);
+  const [showQR, setShowQR] = useState(false);
+  const [showManualOrder, setShowManualOrder] = useState(false);
+  const [manualOrder, setManualOrder] = useState<{ tableNumber: string; items: { name: string; price: number; quantity: number; category: string }[]; notes: string }>({
+    tableNumber: '', items: [], notes: ''
+  });
   const supabase = createClient();
   const router = useRouter();
 
@@ -108,6 +115,41 @@ export default function CashierDashboard() {
     router.push('/auth/login');
   };
 
+  const addItemToManualOrder = (name: string, price: number, category: string) => {
+    setManualOrder(prev => {
+      const existing = prev.items.find(i => i.name === name);
+      if (existing) {
+        return { ...prev, items: prev.items.map(i => i.name === name ? { ...i, quantity: i.quantity + 1 } : i) };
+      }
+      return { ...prev, items: [...prev.items, { name, price, quantity: 1, category }] };
+    });
+  };
+
+  const removeItemFromManualOrder = (name: string) => {
+    setManualOrder(prev => ({ ...prev, items: prev.items.filter(i => i.name !== name) }));
+  };
+
+  const submitManualOrder = async () => {
+    if (!manualOrder.tableNumber || manualOrder.items.length === 0) return;
+    const total = manualOrder.items.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+    
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .insert([{ table_number: manualOrder.tableNumber, total_amount: total, notes: manualOrder.notes || null, status: 'pending' }])
+      .select()
+      .single();
+    
+    if (!orderError && order) {
+      await supabase.from('order_items').insert(
+        manualOrder.items.map(i => ({ order_id: order.id, item_name: i.name, item_price: i.price, quantity: i.quantity, category: i.category }))
+      );
+    }
+    
+    setManualOrder({ tableNumber: '', items: [], notes: '' });
+    setShowManualOrder(false);
+    fetchOrders();
+  };
+
   const getTimeSince = (date: string) => {
     const mins = Math.floor((Date.now() - new Date(date).getTime()) / 60000);
     if (mins < 1) return 'Just now';
@@ -162,6 +204,20 @@ export default function CashierDashboard() {
           
           <div className="flex items-center gap-3">
             <button
+              onClick={() => setShowManualOrder(true)}
+              className="flex items-center gap-2 px-3 py-2 bg-[#c39c4b] text-black rounded-lg font-medium hover:bg-[#d4ad5c] transition-all text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              New Order
+            </button>
+            <button
+              onClick={() => setShowQR(true)}
+              className="flex items-center gap-2 px-3 py-2 bg-blue-500/20 border border-blue-500/50 rounded-lg text-blue-400 hover:bg-blue-500/30 transition-all text-sm"
+            >
+              <QrCode className="w-4 h-4" />
+              QR Codes
+            </button>
+            <button
               onClick={() => setSoundEnabled(!soundEnabled)}
               className={`p-2 rounded-lg border transition-all ${
                 soundEnabled 
@@ -171,6 +227,20 @@ export default function CashierDashboard() {
             >
               {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
             </button>
+            <Link
+              href="/inventory"
+              className="flex items-center gap-2 px-3 py-2 bg-emerald-500/20 border border-emerald-500/50 rounded-lg text-emerald-400 hover:bg-emerald-500/30 transition-all text-sm"
+            >
+              <Package className="w-4 h-4" />
+              Inventory
+            </Link>
+            <Link
+              href="/analytics"
+              className="flex items-center gap-2 px-3 py-2 bg-purple-500/20 border border-purple-500/50 rounded-lg text-purple-400 hover:bg-purple-500/30 transition-all text-sm"
+            >
+              <BarChart3 className="w-4 h-4" />
+              Analytics
+            </Link>
             <Link
               href="/kitchen"
               className="flex items-center gap-2 px-3 py-2 bg-orange-500/20 border border-orange-500/50 rounded-lg text-orange-400 hover:bg-orange-500/30 transition-all text-sm"
@@ -370,6 +440,136 @@ export default function CashierDashboard() {
           </div>
         )}
       </div>
+
+      {/* QR Code Modal */}
+      {showQR && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setShowQR(false)}>
+          <div className="bg-[#111] border border-[#222] rounded-2xl p-6 max-w-lg w-full mx-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold">QR Codes</h2>
+              <button onClick={() => setShowQR(false)} className="text-gray-500 hover:text-white"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="text-center">
+                <div className="bg-white p-4 rounded-xl mb-3 inline-block">
+                  <QRCodeSVG value={typeof window !== 'undefined' ? window.location.origin : ''} size={140} />
+                </div>
+                <h3 className="font-semibold text-[#c39c4b]">Customer Menu</h3>
+                <p className="text-xs text-gray-500">Scan to order from table</p>
+              </div>
+              <div className="text-center">
+                <div className="bg-white p-4 rounded-xl mb-3 inline-block">
+                  <QRCodeSVG value={typeof window !== 'undefined' ? `${window.location.origin}/kitchen` : ''} size={140} />
+                </div>
+                <h3 className="font-semibold text-orange-400">Kitchen Display</h3>
+                <p className="text-xs text-gray-500">For kitchen screens</p>
+              </div>
+              <div className="text-center">
+                <div className="bg-white p-4 rounded-xl mb-3 inline-block">
+                  <QRCodeSVG value={typeof window !== 'undefined' ? `${window.location.origin}/bar` : ''} size={140} />
+                </div>
+                <h3 className="font-semibold text-purple-400">Bar Display</h3>
+                <p className="text-xs text-gray-500">For bar screens</p>
+              </div>
+              <div className="text-center">
+                <div className="bg-white p-4 rounded-xl mb-3 inline-block">
+                  <QRCodeSVG value={typeof window !== 'undefined' ? `${window.location.origin}/cashier` : ''} size={140} />
+                </div>
+                <h3 className="font-semibold text-green-400">Cashier</h3>
+                <p className="text-xs text-gray-500">For cashier station</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual Order Modal */}
+      {showManualOrder && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+          <div className="bg-[#111] border border-[#222] rounded-2xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-[#222]">
+              <h2 className="text-xl font-bold">New Manual Order</h2>
+              <button onClick={() => setShowManualOrder(false)} className="text-gray-500 hover:text-white"><X className="w-5 h-5" /></button>
+            </div>
+            
+            <div className="flex flex-1 overflow-hidden">
+              {/* Menu Items */}
+              <div className="flex-1 p-4 overflow-y-auto border-r border-[#222]">
+                <input
+                  type="text"
+                  value={manualOrder.tableNumber}
+                  onChange={(e) => setManualOrder({ ...manualOrder, tableNumber: e.target.value })}
+                  placeholder="Table Number"
+                  className="w-full bg-[#0a0a0a] border border-[#333] rounded-lg px-4 py-2 mb-4 outline-none focus:border-[#c39c4b]/50"
+                />
+                <div className="space-y-4">
+                  {Object.entries(menuData).slice(0, 8).map(([catKey, category]) => (
+                    <div key={catKey}>
+                      <h4 className="text-sm font-semibold text-gray-400 mb-2 capitalize">{category.title}</h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        {category.items.slice(0, 6).map(item => (
+                          <button
+                            key={item.name}
+                            onClick={() => addItemToManualOrder(item.name, item.price, catKey)}
+                            className="text-left p-2 bg-[#1a1a1a] hover:bg-[#222] border border-[#222] rounded-lg transition-all"
+                          >
+                            <p className="text-sm font-medium truncate">{item.name}</p>
+                            <p className="text-xs text-[#c39c4b]">{item.price} ETB</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Order Summary */}
+              <div className="w-80 p-4 flex flex-col">
+                <h3 className="font-semibold mb-3">Order Items</h3>
+                <div className="flex-1 overflow-y-auto space-y-2 mb-4">
+                  {manualOrder.items.length === 0 ? (
+                    <p className="text-gray-500 text-sm text-center py-8">Click items to add</p>
+                  ) : (
+                    manualOrder.items.map(item => (
+                      <div key={item.name} className="flex items-center justify-between bg-[#1a1a1a] p-2 rounded-lg">
+                        <div>
+                          <p className="text-sm font-medium">{item.name}</p>
+                          <p className="text-xs text-gray-500">{item.quantity}x {item.price} ETB</p>
+                        </div>
+                        <button onClick={() => removeItemFromManualOrder(item.name)} className="text-red-400 hover:text-red-300">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <textarea
+                  value={manualOrder.notes}
+                  onChange={(e) => setManualOrder({ ...manualOrder, notes: e.target.value })}
+                  placeholder="Notes (optional)"
+                  rows={2}
+                  className="w-full bg-[#0a0a0a] border border-[#222] rounded-lg px-3 py-2 text-sm mb-3 outline-none resize-none"
+                />
+                <div className="border-t border-[#222] pt-3">
+                  <div className="flex justify-between mb-3">
+                    <span className="text-gray-400">Total</span>
+                    <span className="text-xl font-bold text-[#c39c4b]">
+                      {manualOrder.items.reduce((sum, i) => sum + (i.price * i.quantity), 0).toLocaleString()} ETB
+                    </span>
+                  </div>
+                  <button
+                    onClick={submitManualOrder}
+                    disabled={!manualOrder.tableNumber || manualOrder.items.length === 0}
+                    className="w-full bg-[#c39c4b] text-black py-3 rounded-lg font-bold hover:bg-[#d4ad5c] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Submit Order
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
