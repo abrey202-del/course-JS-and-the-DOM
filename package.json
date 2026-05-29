@@ -1,0 +1,9 @@
+{
+  "name": "js-and-the-dom",
+  "version": "1.0.0",
+  "description": "JavaScript and the DOM course project",
+  "scripts": {
+    "dev": "npx serve -l 3000",
+    "start": "npx serve -l 3000"
+  }
+}
