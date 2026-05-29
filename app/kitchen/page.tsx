@@ -4,10 +4,9 @@ import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { updateOrderStatus } from "@/lib/actions";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { 
   Clock, CheckCircle2, Bell, Timer, RefreshCw, 
-  ChefHat, LogOut, Volume2, VolumeX, ArrowRight,
+  ChefHat, Volume2, VolumeX, ArrowRight,
   Utensils, Flame, AlertCircle, Wine, DollarSign
 } from "lucide-react";
 
@@ -40,7 +39,6 @@ export default function KitchenDashboard() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [lastOrderCount, setLastOrderCount] = useState(0);
   const supabase = createClient();
-  const router = useRouter();
 
   const playNotification = useCallback(() => {
     if (soundEnabled) {
@@ -104,11 +102,6 @@ export default function KitchenDashboard() {
   const handleStartPreparing = async (orderId: string) => {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'preparing' as OrderStatus } : o));
     await updateOrderStatus(orderId, 'preparing');
-  };
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/auth/login');
   };
 
   const getTimeSince = (date: string) => {
@@ -183,9 +176,6 @@ export default function KitchenDashboard() {
             </Link>
             <button onClick={fetchOrders} className="p-2 rounded-lg bg-[#222] border border-[#333] text-gray-400 hover:text-white">
               <RefreshCw className="w-5 h-5" />
-            </button>
-            <button onClick={handleLogout} className="p-2 rounded-lg bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500/30">
-              <LogOut className="w-5 h-5" />
             </button>
           </div>
         </div>
