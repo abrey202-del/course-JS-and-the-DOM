@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { menuData, GROUPS } from '@/lib/menu-data'
 
 interface OrderItem {
   item_name: string
@@ -114,4 +115,87 @@ export async function getActiveOrders() {
   }
   
   return orders
+}
+
+export async function seedMenuItems() {
+  const supabase = await createClient()
+  
+  // Check if menu items already exist
+  const { count } = await supabase
+    .from('menu_items')
+    .select('*', { count: 'exact', head: true })
+  
+  if (count && count > 0) {
+    return { success: true, message: 'Menu items already seeded', count }
+  }
+  
+  // Prepare menu items for insertion
+  const menuItems: Array<{
+    name: string
+    name_am: string | null
+    price: number
+    category: string
+    group_type: 'food' | 'drinks'
+    description: string | null
+    is_available: boolean
+    sort_order: number
+  }> = []
+  
+  let sortOrder = 0
+  
+  // Map categories to groups
+  const categoryToGroup: Record<string, 'food' | 'drinks'> = {}
+  GROUPS.forEach(group => {
+    group.cats.forEach(cat => {
+      categoryToGroup[cat] = group.id as 'food' | 'drinks'
+    })
+  })
+  
+  // Flatten menu data into items
+  Object.entries(menuData).forEach(([categoryKey, category]) => {
+    category.items.forEach(item => {
+      menuItems.push({
+        name: item.name,
+        name_am: null,
+        price: item.price,
+        category: categoryKey === 'colddrinks' ? 'cold' : categoryKey === 'hotdrinks' ? 'hot' : categoryKey,
+        group_type: categoryToGroup[categoryKey] || 'food',
+        description: item.desc || null,
+        is_available: true,
+        sort_order: sortOrder++
+      })
+    })
+  })
+  
+  // Insert all menu items
+  const { error } = await supabase
+    .from('menu_items')
+    .insert(menuItems)
+  
+  if (error) {
+    console.error('Error seeding menu items:', error)
+    return { success: false, error: error.message }
+  }
+  
+  revalidatePath('/menu-management')
+  return { success: true, message: `Seeded ${menuItems.length} menu items`, count: menuItems.length }
+}
+
+export async function getMenuItems() {
+  const supabase = await createClient()
+  
+  const { data, error } = await supabase
+    .from('menu_items')
+    .select('*')
+    .eq('is_available', true)
+    .order('group_type')
+    .order('category')
+    .order('sort_order')
+  
+  if (error) {
+    console.error('Error fetching menu items:', error)
+    return []
+  }
+  
+  return data
 }

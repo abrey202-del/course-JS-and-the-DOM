@@ -67,16 +67,41 @@ export default function KitchenDisplay() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [lastOrderCount, setLastOrderCount] = useState(0);
   const supabase = createClient();
 
+  // Request notification permission
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then(permission => {
+        setNotificationsEnabled(permission === 'granted');
+      });
+    } else if ('Notification' in window && Notification.permission === 'granted') {
+      setNotificationsEnabled(true);
+    }
+  }, []);
+
   const playNotification = useCallback(() => {
     if (soundEnabled && typeof window !== 'undefined') {
-      const audio = new Audio('/notification.mp3');
-      audio.volume = 0.5;
+      // Use base64 encoded notification sound
+      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleVOGwtHJm2M5cLS7qKOaiXR0d3Zrflt8xOLV0MCKT2Zsa29OWUxWmHpSbJ+elG9vaYRtl3B7dXdYdnB0bmlmbnN4dIN0gIqPjoqAdX6BgX5zfH50dGludHt2f352cnhzdX57g4R+d3N1d4GJhYV6dneAhYKEf3t8d3t9e396eXx+fn59fn14c3R4gIaEgHd2f4CEg4J/f398fnx9fHx9fn59e3p7fHx9fn17eXp9gIGAf3x8fH9/fn18fX1+fn19fX18fX19fX19fX19fX19fH19fX19fHx9fX19fX19fHx9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19');
+      audio.volume = 0.7;
       audio.play().catch(() => {});
     }
   }, [soundEnabled]);
+
+  const showBrowserNotification = useCallback((order: Order) => {
+    if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
+      const itemCount = order.order_items?.length || 0;
+      new Notification('NEW ORDER - Table ' + order.table_number, {
+        body: `${itemCount} item${itemCount > 1 ? 's' : ''} ready to prepare`,
+        icon: '/images/hasset-logo.jpg',
+        tag: order.id,
+        requireInteraction: true,
+      });
+    }
+  }, [notificationsEnabled]);
 
   const fetchOrders = useCallback(async () => {
     const { data, error } = await supabase
@@ -87,14 +112,17 @@ export default function KitchenDisplay() {
 
     if (!error && data) {
       const newPendingCount = data.filter(o => o.status === 'pending').length;
-      if (newPendingCount > lastOrderCount) {
+      if (newPendingCount > lastOrderCount && lastOrderCount >= 0) {
         playNotification();
+        // Show notification for the newest order
+        const newOrder = data.find(o => o.status === 'pending');
+        if (newOrder) showBrowserNotification(newOrder);
       }
       setLastOrderCount(newPendingCount);
       setOrders(data);
     }
     setLoading(false);
-  }, [supabase, lastOrderCount, playNotification]);
+  }, [supabase, lastOrderCount, playNotification, showBrowserNotification]);
 
   useEffect(() => {
     fetchOrders();

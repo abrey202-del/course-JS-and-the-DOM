@@ -69,7 +69,11 @@ function MenuContent() {
 
   const fmt = (n: number) => (n % 1 === 0 ? n.toLocaleString() : n.toFixed(2));
 
-  const orderUrl = typeof window !== "undefined" ? window.location.href : "";
+  const [orderUrl, setOrderUrl] = useState("");
+  
+  useEffect(() => {
+    setOrderUrl(window.location.href);
+  }, []);
 
   const handleSubmitOrder = () => {
     if (!tableNumber.trim()) {

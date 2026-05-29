@@ -5,11 +5,13 @@ import { createClient } from "@/lib/supabase/client";
 import { updateOrderStatus } from "@/lib/actions";
 import type { Order, OrderStatus } from "@/lib/types";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { 
   Clock, ChefHat, CheckCircle2, Utensils, Bell, 
   Timer, RefreshCw, TrendingUp, DollarSign, ShoppingBag,
-  XCircle, LayoutDashboard, ExternalLink, QrCode, Monitor
+  XCircle, LayoutDashboard, ExternalLink, QrCode, Monitor,
+  LogOut, Settings, BellRing, Volume2, VolumeX
 } from "lucide-react";
 
 const STATUS_OPTIONS: { value: OrderStatus; label: string; color: string }[] = [
@@ -44,7 +46,42 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<OrderStatus | 'all'>('all');
   const [showQR, setShowQR] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [lastOrderCount, setLastOrderCount] = useState(0);
   const supabase = createClient();
+  const router = useRouter();
+
+  // Request notification permission
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then(permission => {
+        setNotificationsEnabled(permission === 'granted');
+      });
+    } else if ('Notification' in window && Notification.permission === 'granted') {
+      setNotificationsEnabled(true);
+    }
+  }, []);
+
+  // Play sound and show notification for new orders
+  const playNotificationSound = useCallback(() => {
+    if (soundEnabled) {
+      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleVOGwtHJm2M5cLS7qKOaiXR0d3Zrflt8xOLV0MCKT2Zsa29OWUxWmHpSbJ+elG9vaYRtl3B7dXdYdnB0bmlmbnN4dIN0gIqPjoqAdX6BgX5zfH50dGludHt2f352cnhzdX57g4R+d3N1d4GJhYV6dneAhYKEf3t8d3t9e396eXx+fn59fn14c3R4gIaEgHd2f4CEg4J/f398fnx9fHx9fn59e3p7fHx9fn17eXp9gIGAf3x8fH9/fn18fX1+fn19fX18fX19fX19fX19fX19fH19fX19fHx9fX19fX19fHx9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19');
+      audio.volume = 0.5;
+      audio.play().catch(() => {});
+    }
+  }, [soundEnabled]);
+
+  const showBrowserNotification = useCallback((order: Order) => {
+    if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
+      const itemCount = order.order_items?.length || 0;
+      new Notification('New Order - Table ' + order.table_number, {
+        body: `${itemCount} item${itemCount > 1 ? 's' : ''} - ${Number(order.total_amount).toLocaleString()} ETB`,
+        icon: '/images/hasset-logo.jpg',
+        tag: order.id,
+      });
+    }
+  }, [notificationsEnabled]);
 
   const fetchOrders = useCallback(async () => {
     let query = supabase
@@ -56,10 +93,19 @@ export default function AdminDashboard() {
     const { data, error } = await query;
 
     if (!error && data) {
+      // Check for new orders
+      const pendingOrders = data.filter(o => o.status === 'pending');
+      if (pendingOrders.length > lastOrderCount && lastOrderCount > 0) {
+        // New order came in
+        const newOrder = pendingOrders[0];
+        playNotificationSound();
+        showBrowserNotification(newOrder);
+      }
+      setLastOrderCount(pendingOrders.length);
       setOrders(data);
     }
     setLoading(false);
-  }, [supabase]);
+  }, [supabase, lastOrderCount, playNotificationSound, showBrowserNotification]);
 
   useEffect(() => {
     fetchOrders();
@@ -86,6 +132,12 @@ export default function AdminDashboard() {
       o.id === orderId ? { ...o, status: newStatus } : o
     ));
     await updateOrderStatus(orderId, newStatus);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/auth/login');
+    router.refresh();
   };
 
   const filteredOrders = filter === 'all' 
@@ -126,6 +178,17 @@ export default function AdminDashboard() {
           </div>
           <div className="flex items-center gap-3">
             <button
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className={`p-2 rounded-lg border transition-all ${
+                soundEnabled 
+                  ? 'bg-green-500/20 border-green-500/50 text-green-400' 
+                  : 'bg-[#222] border-[#333] text-gray-500'
+              }`}
+              title={soundEnabled ? 'Sound notifications on' : 'Sound notifications off'}
+            >
+              {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+            </button>
+            <button
               onClick={() => setShowQR(true)}
               className="flex items-center gap-2 px-4 py-2 bg-[#c39c4b]/20 border border-[#c39c4b]/50 rounded-lg text-[#c39c4b] hover:bg-[#c39c4b]/30 transition-all text-sm font-medium"
             >
@@ -133,18 +196,32 @@ export default function AdminDashboard() {
               QR Codes
             </button>
             <Link
+              href="/menu-management"
+              className="flex items-center gap-2 px-4 py-2 bg-purple-500/20 border border-purple-500/50 rounded-lg text-purple-400 hover:bg-purple-500/30 transition-all text-sm font-medium"
+            >
+              <Settings className="w-4 h-4" />
+              Menu
+            </Link>
+            <Link
               href="/kitchen"
               target="_blank"
               className="flex items-center gap-2 px-4 py-2 bg-blue-500/20 border border-blue-500/50 rounded-lg text-blue-400 hover:bg-blue-500/30 transition-all text-sm font-medium"
             >
               <Monitor className="w-4 h-4" />
-              Kitchen Display
+              Kitchen
             </Link>
             <button
               onClick={fetchOrders}
               className="p-2 rounded-lg bg-[#222] border border-[#333] text-gray-400 hover:text-white transition-all"
             >
               <RefreshCw className="w-5 h-5" />
+            </button>
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-lg bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500/30 transition-all"
+              title="Logout"
+            >
+              <LogOut className="w-5 h-5" />
             </button>
           </div>
         </div>
