@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hasset — Cashier</title>
+<script src="hasset-store.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f0f4f8;--surface:#fff;--surface2:#f7fafc;--border:#e2e8f0;
+  --primary:#2d3748;--accent:#d4a017;--red:#e53e3e;--green:#38a169;
+  --orange:#dd6b20;--blue:#3182ce;--muted:#718096;--text:#1a202c;
+  --radius:10px;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+
+/* Header */
+.header{background:var(--primary);color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200}
+.header-left{display:flex;align-items:center;gap:12px}
+.role-badge{background:var(--accent);color:var(--primary);padding:4px 12px;border-radius:999px;font-size:12px;font-weight:800;letter-spacing:1px}
+.restaurant-title{font-size:18px;font-weight:700;color:var(--accent)}
+.header-right{display:flex;gap:24px;align-items:center}
+.hstat{text-align:center}
+.hstat .n{font-size:20px;font-weight:800}
+.hstat .l{font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:.5px}
+.clock{font-size:13px;opacity:.6;font-variant-numeric:tabular-nums}
+
+/* Two-panel layout */
+.layout{display:grid;grid-template-columns:380px 1fr;height:calc(100vh - 57px)}
+@media(max-width:900px){.layout{grid-template-columns:1fr;height:auto}}
+
+/* Left panel — order builder */
+.left-panel{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.panel-head{padding:14px 18px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:space-between}
+.panel-head .badge{font-size:11px;background:var(--accent);color:var(--primary);padding:2px 10px;border-radius:999px;font-weight:800}
+
+/* Table selector */
+.table-row{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.table-row label{font-size:13px;font-weight:600;white-space:nowrap;color:var(--muted)}
+.table-input{border:1.5px solid var(--border);border-radius:8px;padding:7px 12px;font-size:14px;font-weight:700;width:80px;color:var(--text);background:var(--surface2)}
+.table-input:focus{outline:none;border-color:var(--accent)}
+.type-tabs{display:flex;gap:6px}
+.type-tab{padding:6px 14px;border-radius:999px;border:1.5px solid var(--border);background:var(--surface2);font-size:12px;font-weight:600;cursor:pointer;color:var(--muted)}
+.type-tab.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+/* Search + category */
+.search-area{padding:10px 18px;border-bottom:1px solid var(--border)}
+.search-box{width:100%;border:1.5px solid var(--border);border-radius:8px;padding:8px 14px;font-size:13px;background:var(--surface2);color:var(--text)}
+.search-box:focus{outline:none;border-color:var(--accent)}
+.cat-chips{display:flex;gap:6px;overflow-x:auto;padding:8px 0 0;scrollbar-width:none}
+.cat-chips::-webkit-scrollbar{display:none}
+.cat-chip{flex-shrink:0;padding:4px 12px;border-radius:999px;border:1px solid var(--border);background:#fff;font-size:11px;font-weight:600;cursor:pointer;color:var(--muted);white-space:nowrap}
+.cat-chip.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+/* Menu list */
+.menu-list{flex:1;overflow-y:auto;padding:8px 0}
+.menu-item{display:flex;align-items:center;gap:10px;padding:9px 18px;cursor:pointer;border-bottom:1px solid var(--border)}
+.menu-item:hover{background:var(--surface2)}
+.mi-emoji{font-size:20px;width:32px;text-align:center}
+.mi-name{flex:1;font-size:13px;font-weight:500}
+.mi-price{font-size:13px;font-weight:700;color:var(--accent);white-space:nowrap}
+.mi-add{width:28px;height:28px;background:var(--primary);color:#fff;border:none;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* Cart */
+.cart-section{border-top:2px solid var(--border);background:var(--surface2)}
+.cart-head{padding:10px 18px;font-weight:700;font-size:13px;display:flex;justify-content:space-between;align-items:center}
+.cart-clear{font-size:11px;color:var(--red);cursor:pointer;font-weight:600;background:none;border:none}
+.cart-items{max-height:200px;overflow-y:auto;padding:0 18px}
+.cart-item{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)}
+.cart-item:last-child{border:none}
+.ci-name{flex:1;font-size:12px}
+.ci-qty-ctrl{display:flex;align-items:center;gap:6px}
+.ci-btn{width:22px;height:22px;border-radius:50%;border:1px solid var(--border);background:#fff;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
+.ci-qty{font-size:13px;font-weight:700;min-width:16px;text-align:center}
+.ci-price{font-size:12px;font-weight:600;color:var(--accent);white-space:nowrap}
+.ci-remove{background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:2px}
+
+/* Note */
+.note-row{padding:8px 18px}
+.note-input{width:100%;border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:12px;resize:none;background:#fff;color:var(--text)}
+.note-input:focus{outline:none;border-color:var(--accent)}
+
+/* Total & submit */
+.cart-foot{padding:12px 18px;border-top:1px solid var(--border)}
+.total-row{display:flex;justify-content:space-between;font-size:16px;font-weight:800;margin-bottom:12px}
+.total-amount{color:var(--accent)}
+.submit-btn{width:100%;padding:13px;background:var(--primary);color:#fff;border:none;border-radius:var(--radius);font-size:15px;font-weight:700;cursor:pointer;transition:opacity .15s}
+.submit-btn:hover{opacity:.88}
+.submit-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* Right panel — order tracker */
+.right-panel{display:flex;flex-direction:column;overflow:hidden}
+.orders-header{padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:space-between}
+.filter-tabs{display:flex;gap:6px}
+.filter-tab{padding:6px 16px;border-radius:999px;border:1px solid var(--border);background:#fff;font-size:12px;font-weight:600;cursor:pointer;color:var(--muted)}
+.filter-tab.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+/* Orders grid */
+.orders-grid{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
+
+/* Order row */
+.order-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);display:flex;align-items:stretch;overflow:hidden}
+.order-row.new-order{border-color:var(--blue);animation:pulse 2s 3}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(49,130,206,.3)}50%{box-shadow:0 0 0 6px rgba(49,130,206,.1)}}
+.or-status-bar{width:5px;flex-shrink:0}
+.or-status-bar.pending{background:var(--blue)}
+.or-status-bar.kitchen{background:var(--orange)}
+.or-status-bar.ready{background:var(--green)}
+.or-status-bar.paid{background:#a0aec0}
+.or-status-bar.cancelled{background:var(--red)}
+.or-body{flex:1;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.or-top{display:flex;align-items:center;gap:10px}
+.or-id{font-size:13px;font-weight:700;color:var(--primary)}
+.or-table{font-size:12px;color:var(--muted);background:var(--surface2);padding:2px 8px;border-radius:999px}
+.or-type{font-size:11px;color:var(--muted)}
+.or-time{font-size:11px;color:var(--muted);margin-left:auto}
+.or-items{display:flex;flex-wrap:wrap;gap:4px}
+.or-tag{font-size:11px;background:var(--surface2);padding:2px 8px;border-radius:999px;color:var(--text)}
+.or-foot{display:flex;align-items:center;justify-content:space-between}
+.or-total{font-size:14px;font-weight:700;color:var(--accent)}
+.or-status-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.or-status-label.pending{color:var(--blue)}
+.or-status-label.kitchen{color:var(--orange)}
+.or-status-label.bar{color:var(--orange)}
+.or-status-label.ready{color:var(--green)}
+.or-status-label.served{color:var(--green)}
+.or-status-label.paid{color:var(--muted)}
+.or-status-label.cancelled{color:var(--red)}
+.or-actions{display:flex;gap:6px}
+.or-btn{padding:5px 12px;border-radius:999px;border:none;font-size:11px;font-weight:700;cursor:pointer}
+.or-btn.pay{background:var(--green);color:#fff}
+.or-btn.cancel{background:#fed7d7;color:var(--red)}
+.or-btn.print{background:var(--surface2);color:var(--primary)}
+
+/* Empty */
+.empty{padding:60px;text-align:center;color:var(--muted);font-size:14px}
+.empty .icon{font-size:40px;margin-bottom:10px;opacity:.3}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="role-badge">CASHIER</div>
+    <div class="restaurant-title">Hasset</div>
+  </div>
+  <div class="header-right">
+    <div class="hstat"><div class="n" id="h-open">0</div><div class="l">Open</div></div>
+    <div class="hstat"><div class="n" id="h-paid">0</div><div class="l">Paid Today</div></div>
+    <div class="hstat"><div class="n" id="h-revenue">0</div><div class="l">Revenue (ETB)</div></div>
+    <div class="clock" id="clockEl">00:00</div>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- LEFT: Order Builder -->
+  <div class="left-panel">
+    <div class="panel-head">
+      <span>New Order</span>
+      <span class="badge" id="cart-count-badge">0 items</span>
+    </div>
+
+    <div class="table-row">
+      <label>Table</label>
+      <input class="table-input" type="number" id="tableInput" value="1" min="1" max="50">
+      <div class="type-tabs">
+        <button class="type-tab active" id="tab-dine" onclick="setType('dine-in')">Dine In</button>
+        <button class="type-tab" id="tab-take" onclick="setType('takeaway')">Takeaway</button>
+      </div>
+    </div>
+
+    <div class="search-area">
+      <input class="search-box" type="text" id="menuSearch" placeholder="Search menu..." oninput="renderMenu()">
+      <div class="cat-chips" id="catChips"></div>
+    </div>
+
+    <div class="menu-list" id="menuList"></div>
+
+    <div class="cart-section">
+      <div class="cart-head">
+        <span>Cart</span>
+        <button class="cart-clear" onclick="clearCart()">Clear all</button>
+      </div>
+      <div class="cart-items" id="cartItems"></div>
+      <div class="note-row">
+        <textarea class="note-input" id="noteInput" rows="2" placeholder="Special instructions..."></textarea>
+      </div>
+      <div class="cart-foot">
+        <div class="total-row">
+          <span>Total</span>
+          <span class="total-amount" id="cartTotal">0 ETB</span>
+        </div>
+        <button class="submit-btn" id="submitBtn" onclick="submitOrder()">Place Order</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Order Tracker -->
+  <div class="right-panel">
+    <div class="orders-header">
+      <strong style="font-size:14px">All Orders</strong>
+      <div class="filter-tabs">
+        <button class="filter-tab active" onclick="setFilter('all',this)">All</button>
+        <button class="filter-tab" onclick="setFilter('pending',this)">Pending</button>
+        <button class="filter-tab" onclick="setFilter('kitchen',this)">Kitchen</button>
+        <button class="filter-tab" onclick="setFilter('ready',this)">Ready</button>
+        <button class="filter-tab" onclick="setFilter('paid',this)">Paid</button>
+      </div>
+    </div>
+    <div class="orders-grid" id="ordersGrid"></div>
+  </div>
+</div>
+
+<script>
+Store.init();
+let cart = {};
+let activeType = 'dine-in';
+let activeCat = 'All';
+let activeFilter = 'all';
+let seenOrders = new Set();
+
+// Clock
+setInterval(() => {
+  document.getElementById('clockEl').textContent = new Date().toLocaleTimeString('en-ET',{hour:'2-digit',minute:'2-digit'});
+}, 1000);
+
+// Order type toggle
+function setType(t) {
+  activeType = t;
+  document.getElementById('tab-dine').className = 'type-tab' + (t==='dine-in'?' active':'');
+  document.getElementById('tab-take').className = 'type-tab' + (t==='takeaway'?' active':'');
+}
+
+function setFilter(f, el) {
+  activeFilter = f;
+  document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderOrders();
+}
+
+// ── Menu ─────────────────────────────────────────────────
+const CATS = ['All', ...new Set(MENU_DATA.map(m => m.cat))];
+
+function renderCatChips() {
+  document.getElementById('catChips').innerHTML = CATS.map(c =>
+    `<button class="cat-chip${c===activeCat?' active':''}" onclick="setCat('${c}')">${c}</button>`
+  ).join('');
+}
+function setCat(c) { activeCat = c; renderCatChips(); renderMenu(); }
+
+function renderMenu() {
+  const q = document.getElementById('menuSearch').value.toLowerCase();
+  const items = MENU_DATA.filter(m => {
+    const mc = activeCat === 'All' || m.cat === activeCat;
+    const mq = !q || m.name.toLowerCase().includes(q);
+    return mc && mq;
+  });
+  document.getElementById('menuList').innerHTML = items.map(m =>
+    `<div class="menu-item">
+      <span class="mi-emoji">${m.emoji}</span>
+      <span class="mi-name">${m.name}</span>
+      <span class="mi-price">${m.price}</span>
+      <button class="mi-add" onclick="addToCart(${m.id})">+</button>
+    </div>`
+  ).join('') || '<div style="padding:20px;text-align:center;color:#aaa;font-size:13px">No items found</div>';
+}
+
+// ── Cart ─────────────────────────────────────────────────
+function addToCart(id) {
+  cart[id] = (cart[id] || 0) + 1;
+  renderCart();
+}
+function removeFromCart(id) {
+  if (cart[id] > 1) cart[id]--;
+  else delete cart[id];
+  renderCart();
+}
+function clearCart() { cart = {}; renderCart(); }
+
+function renderCart() {
+  const entries = Object.entries(cart);
+  const total = entries.reduce((s,[id,q]) => s + MENU_DATA.find(m=>m.id==id).price * q, 0);
+  const count = entries.reduce((s,[,q]) => s+q, 0);
+
+  document.getElementById('cart-count-badge').textContent = count + ' item' + (count!==1?'s':'');
+  document.getElementById('cartTotal').textContent = total.toLocaleString() + ' ETB';
+  document.getElementById('submitBtn').disabled = count === 0;
+
+  document.getElementById('cartItems').innerHTML = entries.map(([id,qty]) => {
+    const m = MENU_DATA.find(x => x.id == id);
+    return `<div class="cart-item">
+      <span style="font-size:16px">${m.emoji}</span>
+      <span class="ci-name">${m.name}</span>
+      <div class="ci-qty-ctrl">
+        <button class="ci-btn" onclick="removeFromCart(${id})">-</button>
+        <span class="ci-qty">${qty}</span>
+        <button class="ci-btn" onclick="addToCart(${id})">+</button>
+      </div>
+      <span class="ci-price">${(m.price*qty).toLocaleString()}</span>
+      <button class="ci-remove" onclick="delete cart[${id}];renderCart()">x</button>
+    </div>`;
+  }).join('') || '<div style="padding:12px 0;color:#aaa;font-size:12px;text-align:center">Cart is empty</div>';
+}
+
+function submitOrder() {
+  const entries = Object.entries(cart);
+  if (!entries.length) return;
+  const items = entries.map(([id,qty]) => {
+    const m = MENU_DATA.find(x => x.id == id);
+    return { menuId: parseInt(id), name: m.name, price: m.price, qty, emoji: m.emoji };
+  });
+  const order = Store.addOrder({
+    table: document.getElementById('tableInput').value,
+    type: activeType,
+    items,
+    note: document.getElementById('noteInput').value,
+    source: 'cashier',
+  });
+  cart = {};
+  document.getElementById('noteInput').value = '';
+  renderCart();
+  renderOrders();
+  renderStats();
+  // Flash the new order in list
+  setTimeout(() => {
+    const el = document.getElementById('ord-' + order.id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+// ── Orders ────────────────────────────────────────────────
+function statusLabel(o) {
+  if (o.status === STATUS.CANCELLED) return 'cancelled';
+  if (o.status === STATUS.PAID) return 'paid';
+  const ks = o.kitchenStatus, bs = o.barStatus;
+  if (ks === 'ready' && (bs === 'ready' || bs === 'na')) return 'ready';
+  if (ks === 'cooking' || bs === 'bar') return 'kitchen';
+  return 'pending';
+}
+
+function renderOrders() {
+  const today = Store.getTodayOrders();
+  let orders = today;
+  if (activeFilter !== 'all') {
+    orders = today.filter(o => {
+      const sl = statusLabel(o);
+      if (activeFilter === 'kitchen') return sl === 'kitchen';
+      if (activeFilter === 'ready') return sl === 'ready';
+      if (activeFilter === 'pending') return sl === 'pending';
+      if (activeFilter === 'paid') return o.status === STATUS.PAID;
+      return true;
+    });
+  }
+
+  if (!orders.length) {
+    document.getElementById('ordersGrid').innerHTML = '<div class="empty"><div class="icon">🧾</div>No orders found</div>';
+    return;
+  }
+
+  document.getElementById('ordersGrid').innerHTML = orders.map(o => {
+    const sl = statusLabel(o);
+    const isNew = !seenOrders.has(o.id);
+    if (isNew) seenOrders.add(o.id);
+    const total = Store.orderTotal(o);
+    const itemTags = o.items.slice(0,5).map(i =>
+      `<span class="or-tag">${i.emoji} ${i.name} x${i.qty}</span>`
+    ).join('') + (o.items.length > 5 ? `<span class="or-tag">+${o.items.length-5} more</span>` : '');
+
+    const payBtn = (sl === 'ready' || sl === 'kitchen' || sl === 'pending') && o.status !== STATUS.PAID && o.status !== STATUS.CANCELLED
+      ? `<button class="or-btn pay" onclick="markPaid('${o.id}')">Paid</button>` : '';
+    const cancelBtn = o.status !== STATUS.PAID && o.status !== STATUS.CANCELLED
+      ? `<button class="or-btn cancel" onclick="cancelOrder('${o.id}')">Cancel</button>` : '';
+    const printBtn = `<button class="or-btn print" onclick="printReceipt('${o.id}')">Receipt</button>`;
+
+    return `<div class="order-row${isNew && seenOrders.size > 1 ? ' new-order' : ''}" id="ord-${o.id}">
+      <div class="or-status-bar ${sl}"></div>
+      <div class="or-body">
+        <div class="or-top">
+          <span class="or-id">${o.id}</span>
+          <span class="or-table">Table ${o.table}</span>
+          <span class="or-type">${o.type || 'dine-in'} - ${o.source === 'qr' ? 'QR' : 'Staff'}</span>
+          <span class="or-time">${Store.formatTime(o.createdAt)}</span>
+        </div>
+        <div class="or-items">${itemTags}</div>
+        ${o.note ? `<div style="font-size:11px;color:#718096;font-style:italic">${o.note}</div>` : ''}
+        <div class="or-foot">
+          <span class="or-total">${total.toLocaleString()} ETB</span>
+          <span class="or-status-label ${sl}">${sl.toUpperCase()}</span>
+          <div class="or-actions">${payBtn}${cancelBtn}${printBtn}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function markPaid(id) {
+  Store.updateOrder(id, { status: STATUS.PAID, paidAt: Date.now() });
+  renderOrders(); renderStats();
+}
+function cancelOrder(id) {
+  if (confirm('Cancel order?')) {
+    Store.updateOrder(id, { status: STATUS.CANCELLED });
+    renderOrders(); renderStats();
+  }
+}
+function printReceipt(id) {
+  const o = Store.getOrder(id);
+  if (!o) return;
+  const lines = o.items.map(i => `  ${i.emoji} ${i.name.padEnd(28)} x${i.qty}  ${(i.price*i.qty).toLocaleString()} ETB`).join('\n');
+  const win = window.open('','_blank','width=400,height=600');
+  win.document.write(`<pre style="font-family:monospace;font-size:13px;padding:20px">
+================================
+       HASSET RESTAURANT
+================================
+Order: ${o.id}
+Table: ${o.table}   Type: ${o.type}
+Time:  ${Store.formatTime(o.createdAt)}
+--------------------------------
+${lines}
+--------------------------------
+TOTAL: ${Store.orderTotal(o).toLocaleString()} ETB
+================================
+       Thank you!
+================================
+</pre>`);
+  win.print();
+}
+
+function renderStats() {
+  const today = Store.getTodayOrders();
+  const open = today.filter(o => o.status !== STATUS.PAID && o.status !== STATUS.CANCELLED).length;
+  const paid = today.filter(o => o.status === STATUS.PAID);
+  const revenue = paid.reduce((s,o) => s + Store.orderTotal(o), 0);
+  document.getElementById('h-open').textContent = open;
+  document.getElementById('h-paid').textContent = paid.length;
+  document.getElementById('h-revenue').textContent = revenue.toLocaleString();
+}
+
+// Sync
+Store.onUpdate(msg => {
+  if (['orders_updated','new_order','order_updated'].includes(msg.type)) {
+    renderOrders(); renderStats();
+  }
+});
+
+// Init
+renderCatChips();
+renderMenu();
+renderCart();
+renderOrders();
+renderStats();
+setInterval(() => { renderOrders(); renderStats(); }, 5000);
+</script>
+</body>
+</html>

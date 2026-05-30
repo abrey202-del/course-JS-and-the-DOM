@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hasset — Bar</title>
+<script src="hasset-store.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0e1a;--surface:#111827;--surface2:#1f2937;--border:#2d3748;
+  --accent:#7c3aed;--gold:#f59e0b;--green:#10b981;--red:#ef4444;
+  --orange:#f97316;--blue:#3b82f6;--text:#f9fafb;--muted:#9ca3af;
+  --radius:14px;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+
+/* Ambient glow bg */
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 20% 50%, rgba(124,58,237,.08) 0%, transparent 60%),radial-gradient(ellipse at 80% 20%, rgba(245,158,11,.06) 0%, transparent 50%);pointer-events:none}
+
+/* Header */
+.header{background:rgba(17,24,39,.95);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.header-left{display:flex;align-items:center;gap:14px}
+.role-badge{background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;padding:5px 14px;border-radius:999px;font-size:12px;font-weight:800;letter-spacing:1px}
+.restaurant-title{font-size:18px;font-weight:700;color:var(--gold)}
+.header-right{display:flex;gap:20px;align-items:center}
+.hstat{text-align:center}
+.hstat .n{font-size:22px;font-weight:800}
+.hstat .l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.sound-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 16px;border-radius:999px;cursor:pointer;font-size:13px}
+.clock{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* Alert banner */
+.alert-bar{background:linear-gradient(90deg,var(--accent),#a855f7);color:#fff;padding:12px 24px;display:none;align-items:center;justify-content:space-between;font-weight:600}
+.alert-bar.show{display:flex}
+.alert-bar button{background:rgba(255,255,255,.2);border:none;color:#fff;padding:4px 14px;border-radius:999px;cursor:pointer;font-size:12px}
+
+/* Main layout */
+.main{padding:20px 24px;max-width:1600px;margin:0 auto}
+
+/* Section titles */
+.section-title{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ACTIVE ORDERS — big visual cards */
+.drinks-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:32px}
+
+.drink-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;position:relative;transition:transform .2s}
+.drink-card:hover{transform:translateY(-3px)}
+.drink-card.urgent{border-color:var(--red);box-shadow:0 0 20px rgba(239,68,68,.25)}
+.drink-card.new-anim{animation:popIn .4s cubic-bezier(.34,1.56,.64,1)}
+@keyframes popIn{0%{transform:scale(.7);opacity:0}100%{transform:scale(1);opacity:1}}
+
+.dc-top{padding:16px 16px 8px;display:flex;justify-content:space-between;align-items:flex-start}
+.dc-order-info{display:flex;flex-direction:column;gap:2px}
+.dc-order-id{font-size:11px;font-weight:700;color:var(--gold)}
+.dc-table{font-size:10px;color:var(--muted)}
+.dc-timer{font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
+.dc-timer.fast{color:var(--green)}
+.dc-timer.medium{color:var(--orange)}
+.dc-timer.slow{color:var(--red)}
+
+/* Big emoji display */
+.dc-visual{padding:8px 16px 12px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.drink-item-visual{display:flex;flex-direction:column;align-items:center;gap:4px;width:100%}
+.drink-emoji-wrap{position:relative;display:inline-block}
+.big-emoji{font-size:52px;line-height:1;filter:drop-shadow(0 4px 8px rgba(0,0,0,.4))}
+.qty-bubble{position:absolute;top:-4px;right:-10px;background:var(--accent);color:#fff;font-size:12px;font-weight:800;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg)}
+.drink-label{font-size:12px;font-weight:600;text-align:center;color:var(--text);line-height:1.3}
+.drink-cat{font-size:10px;color:var(--muted)}
+
+/* Multiple drinks in one order */
+.multi-drinks{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px 12px 12px}
+.mini-drink{display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--surface2);border-radius:10px;padding:10px 6px}
+.mini-emoji{font-size:32px;line-height:1;position:relative}
+.mini-qty{position:absolute;top:-4px;right:-8px;background:var(--accent);color:#fff;font-size:10px;font-weight:800;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.mini-name{font-size:10px;color:var(--muted);text-align:center;line-height:1.2}
+
+/* Done button */
+.dc-foot{padding:10px 14px;border-top:1px solid var(--border);background:var(--surface2)}
+.btn-ready{width:100%;padding:10px;border:none;border-radius:10px;font-weight:800;font-size:13px;cursor:pointer;background:linear-gradient(135deg,var(--green),#059669);color:#fff;transition:opacity .15s}
+.btn-ready:hover{opacity:.88}
+
+/* Completed orders row */
+.done-list{display:flex;flex-direction:column;gap:8px}
+.done-row{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:14px;opacity:.7}
+.done-emojis{font-size:22px;letter-spacing:2px}
+.done-info{flex:1}
+.done-id{font-size:12px;font-weight:700;color:var(--gold)}
+.done-table{font-size:11px;color:var(--muted)}
+.done-items{font-size:11px;color:var(--muted)}
+.done-badge{background:#064e3b;color:var(--green);font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px}
+.done-time{font-size:11px;color:var(--muted)}
+
+/* Empty */
+.empty-state{padding:60px 20px;text-align:center;color:var(--muted)}
+.empty-state .icon{font-size:56px;margin-bottom:16px;opacity:.3;display:block}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="role-badge">BAR</div>
+    <div class="restaurant-title">Hasset</div>
+  </div>
+  <div class="header-right">
+    <div class="hstat"><div class="n" id="stat-pending">0</div><div class="l">Pending</div></div>
+    <div class="hstat"><div class="n" id="stat-done">0</div><div class="l">Served Today</div></div>
+    <button class="sound-btn" id="soundBtn" onclick="toggleSound()">Sound ON</button>
+    <div class="clock" id="clockEl">00:00:00</div>
+  </div>
+</div>
+
+<div class="alert-bar" id="alertBar">
+  <span id="alertText">New drinks order!</span>
+  <button onclick="document.getElementById('alertBar').classList.remove('show')">Dismiss</button>
+</div>
+
+<div class="main">
+  <div class="section-title">Active Drink Orders</div>
+  <div class="drinks-grid" id="drinksGrid"></div>
+
+  <div class="section-title">Completed Today</div>
+  <div class="done-list" id="doneList"></div>
+</div>
+
+<script>
+Store.init();
+let soundOn = true;
+let knownBar = new Set();
+let renderedCards = new Set();
+
+function toggleSound() {
+  soundOn = !soundOn;
+  const b = document.getElementById('soundBtn');
+  b.textContent = soundOn ? 'Sound ON' : 'Sound OFF';
+  Audio.getCtx();
+}
+
+// Clock
+setInterval(() => {
+  document.getElementById('clockEl').textContent = new Date().toLocaleTimeString('en-ET');
+}, 1000);
+
+// Timer helpers
+function elMs(ts){ return Date.now() - ts; }
+function timerCls(ts){ const m=elMs(ts)/60000; return m<8?'fast':m<18?'medium':'slow'; }
+function timerStr(ts){
+  const m=Math.floor(elMs(ts)/60000);
+  const s=Math.floor((elMs(ts)%60000)/1000);
+  return (m>0?m+'m ':'')+s+'s';
+}
+
+function markBarReady(id) {
+  Audio.playDone();
+  Store.updateOrder(id, { barStatus: 'ready' });
+  render();
+}
+
+function renderDrinkCard(order) {
+  const drinks = order.barItems || [];
+  const isNew = !renderedCards.has(order.id);
+  renderedCards.add(order.id);
+  const urgent = elMs(order.createdAt) > 15*60000;
+
+  let visual = '';
+  if (drinks.length === 1) {
+    const d = drinks[0];
+    const m = Store.menuItem(d.menuId) || {};
+    visual = `<div class="dc-visual">
+      <div class="drink-item-visual">
+        <div class="drink-emoji-wrap">
+          <span class="big-emoji">${m.emoji || ''}</span>
+          ${d.qty > 1 ? `<span class="qty-bubble">${d.qty}</span>` : ''}
+        </div>
+        <span class="drink-label">${d.name}</span>
+        <span class="drink-cat">${m.cat || ''}</span>
+      </div>
+    </div>`;
+  } else {
+    visual = `<div class="multi-drinks">` +
+      drinks.map(d => {
+        const m = Store.menuItem(d.menuId) || {};
+        return `<div class="mini-drink">
+          <div class="mini-emoji" style="position:relative">
+            ${m.emoji || ''}
+            ${d.qty > 1 ? `<span class="mini-qty">${d.qty}</span>` : ''}
+          </div>
+          <span class="mini-name">${d.name}</span>
+        </div>`;
+      }).join('') + `</div>`;
+  }
+
+  return `<div class="drink-card${urgent?' urgent':''}${isNew?' new-anim':''}" id="bcard-${order.id}">
+    <div class="dc-top">
+      <div class="dc-order-info">
+        <span class="dc-order-id">${order.id}</span>
+        <span class="dc-table">Table ${order.table || '?'}</span>
+      </div>
+      <span class="dc-timer ${timerCls(order.createdAt)}" data-ts="${order.createdAt}">${timerStr(order.createdAt)}</span>
+    </div>
+    ${visual}
+    <div class="dc-foot">
+      <button class="btn-ready" onclick="markBarReady('${order.id}')">Ready to Serve</button>
+    </div>
+  </div>`;
+}
+
+function render() {
+  const today = Store.getTodayOrders();
+  const barOrders = today.filter(o =>
+    o.status !== STATUS.CANCELLED && o.barItems && o.barItems.length > 0
+  );
+
+  const pending = barOrders.filter(o => o.barStatus === STATUS.BAR || o.barStatus === STATUS.PENDING);
+  const done    = barOrders.filter(o => o.barStatus === 'ready' || o.barStatus === 'served');
+
+  // Detect new
+  pending.forEach(o => {
+    if (!knownBar.has(o.id)) {
+      knownBar.add(o.id);
+      if (knownBar.size > 1) {
+        if (soundOn) Audio.playNewOrder();
+        const drinks = (o.barItems||[]).map(d => d.name).join(', ');
+        document.getElementById('alertText').textContent = `New order ${o.id}: ${drinks}`;
+        document.getElementById('alertBar').classList.add('show');
+        setTimeout(() => document.getElementById('alertBar').classList.remove('show'), 7000);
+      }
+    }
+  });
+  if (knownBar.size === 0) pending.forEach(o => knownBar.add(o.id));
+
+  document.getElementById('stat-pending').textContent = pending.length;
+  document.getElementById('stat-done').textContent = done.length;
+
+  // Active grid
+  const grid = document.getElementById('drinksGrid');
+  if (!pending.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><span class="icon">🍹</span>No pending drink orders — all clear!</div>`;
+  } else {
+    grid.innerHTML = pending.map(renderDrinkCard).join('');
+  }
+
+  // Done list
+  const doneEl = document.getElementById('doneList');
+  if (!done.length) {
+    doneEl.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:16px">No drinks served yet today.</div>`;
+  } else {
+    doneEl.innerHTML = done.slice(0,20).map(o => {
+      const emojis = (o.barItems||[]).map(d => {
+        const m = Store.menuItem(d.menuId);
+        return (m ? m.emoji : '').repeat(Math.min(d.qty, 3));
+      }).join(' ');
+      const names = (o.barItems||[]).map(d => `${d.name} x${d.qty}`).join(', ');
+      return `<div class="done-row">
+        <div class="done-emojis">${emojis}</div>
+        <div class="done-info">
+          <div class="done-id">${o.id}</div>
+          <div class="done-table">Table ${o.table}</div>
+          <div class="done-items">${names}</div>
+        </div>
+        <span class="done-badge">Done</span>
+        <span class="done-time">${Store.formatTime(o.createdAt)}</span>
+      </div>`;
+    }).join('');
+  }
+}
+
+// Live timers
+setInterval(() => {
+  document.querySelectorAll('.dc-timer[data-ts]').forEach(el => {
+    const ts = parseInt(el.dataset.ts);
+    el.textContent = timerStr(ts);
+    el.className = 'dc-timer ' + timerCls(ts);
+  });
+}, 1000);
+
+// Real-time
+Store.onUpdate(msg => {
+  if (['orders_updated','new_order','order_updated'].includes(msg.type)) render();
+});
+
+setInterval(render, 3000);
+render();
+</script>
+</body>
+</html>

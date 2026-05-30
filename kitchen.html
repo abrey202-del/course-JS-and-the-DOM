@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hasset — Kitchen</title>
+<script src="hasset-store.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f0f0f;--surface:#1a1a1a;--surface2:#242424;--border:#2e2e2e;
+  --red:#e53e3e;--orange:#ed8936;--green:#48bb78;--gold:#d4a017;--blue:#4299e1;
+  --text:#f0f0f0;--muted:#888;--radius:12px;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+
+/* Header */
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.header-left{display:flex;align-items:center;gap:12px}
+.role-badge{background:var(--red);color:#fff;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:1px}
+.restaurant-title{font-size:18px;font-weight:700;color:var(--gold)}
+.header-stats{display:flex;gap:20px;align-items:center}
+.stat-chip{text-align:center}
+.stat-chip .num{font-size:22px;font-weight:700;line-height:1}
+.stat-chip .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px}
+.time-display{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* Notification banner */
+.notif-banner{background:var(--red);color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;font-weight:600;font-size:14px;display:none}
+.notif-banner.show{display:flex}
+.notif-banner button{background:rgba(255,255,255,0.25);border:none;color:#fff;padding:4px 14px;border-radius:999px;cursor:pointer;font-size:13px}
+
+/* Layout */
+.main{padding:20px;max-width:1400px;margin:0 auto}
+.cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+@media(max-width:900px){.cols{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.cols{grid-template-columns:1fr}}
+
+/* Column headers */
+.col-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-radius:var(--radius) var(--radius) 0 0;font-weight:700;font-size:13px;letter-spacing:0.5px;text-transform:uppercase}
+.col-head.incoming{background:#3d1515;color:var(--red)}
+.col-head.cooking{background:#3d2a0a;color:var(--orange)}
+.col-head.done{background:#0f2d1a;color:var(--green)}
+.col-count{font-size:20px;font-weight:800}
+
+/* Order cards */
+.col-body{display:flex;flex-direction:column;gap:10px;min-height:300px}
+.order-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:transform .15s}
+.order-card:hover{transform:translateY(-1px)}
+.order-card.urgent{border-color:var(--red);box-shadow:0 0 0 1px var(--red) inset}
+.card-top{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface2)}
+.order-id{font-size:13px;font-weight:700;color:var(--gold)}
+.table-tag{font-size:12px;color:var(--muted)}
+.timer{font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
+.timer.fast{color:var(--green)}
+.timer.medium{color:var(--orange)}
+.timer.slow{color:var(--red)}
+.card-items{padding:10px 14px}
+.card-item{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)}
+.card-item:last-child{border:none}
+.item-emoji{font-size:18px;width:26px;text-align:center}
+.item-name{flex:1;font-size:13px;color:var(--text)}
+.item-qty{font-size:14px;font-weight:700;color:var(--gold);min-width:24px;text-align:right}
+.card-note{padding:6px 14px 10px;font-size:11px;color:var(--muted);font-style:italic}
+.card-actions{padding:10px 14px;display:flex;gap:8px;background:var(--surface2)}
+.btn-full{flex:1;padding:9px;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;transition:opacity .15s}
+.btn-full:hover{opacity:.85}
+.btn-start{background:var(--orange);color:#fff}
+.btn-done{background:var(--green);color:#fff}
+.btn-cancel{background:var(--border);color:var(--muted)}
+
+/* Empty col */
+.col-empty{padding:40px;text-align:center;color:var(--muted);font-size:14px;border:2px dashed var(--border);border-radius:var(--radius);margin-top:0}
+.col-empty .icon{font-size:36px;margin-bottom:8px;opacity:.4}
+
+/* Sound toggle */
+.sound-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 14px;border-radius:999px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:6px}
+.sound-btn.muted{color:var(--muted)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="role-badge">KITCHEN</div>
+    <div class="restaurant-title">Hasset</div>
+  </div>
+  <div class="header-stats">
+    <div class="stat-chip"><div class="num" id="stat-active">0</div><div class="lbl">Active</div></div>
+    <div class="stat-chip"><div class="num" id="stat-done">0</div><div class="lbl">Done Today</div></div>
+    <button class="sound-btn" id="soundBtn" onclick="toggleSound()">Sound ON</button>
+    <div class="time-display" id="clockEl">00:00:00</div>
+  </div>
+</div>
+
+<div class="notif-banner" id="notifBanner">
+  <span id="notifText">New order received!</span>
+  <button onclick="dismissBanner()">Dismiss</button>
+</div>
+
+<div class="main">
+  <div class="cols">
+    <div>
+      <div class="col-head incoming"><span>New Orders</span><span class="col-count" id="cnt-incoming">0</span></div>
+      <div class="col-body" id="col-incoming"></div>
+    </div>
+    <div>
+      <div class="col-head cooking"><span>Cooking</span><span class="col-count" id="cnt-cooking">0</span></div>
+      <div class="col-body" id="col-cooking"></div>
+    </div>
+    <div>
+      <div class="col-head done"><span>Ready</span><span class="col-count" id="cnt-done">0</span></div>
+      <div class="col-body" id="col-done"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+Store.init();
+let soundEnabled = true;
+let knownOrders = new Set();
+
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+  const btn = document.getElementById('soundBtn');
+  btn.textContent = soundEnabled ? 'Sound ON' : 'Sound OFF';
+  btn.className = soundEnabled ? 'sound-btn' : 'sound-btn muted';
+  // Unlock audio context on user interaction
+  Audio.getCtx();
+}
+
+function dismissBanner() {
+  document.getElementById('notifBanner').classList.remove('show');
+}
+
+// Clock
+function updateClock() {
+  document.getElementById('clockEl').textContent = new Date().toLocaleTimeString('en-ET');
+}
+setInterval(updateClock, 1000); updateClock();
+
+function elapsedMs(ts) {
+  return Date.now() - ts;
+}
+function timerClass(ts) {
+  const m = elapsedMs(ts) / 60000;
+  if (m < 10) return 'fast';
+  if (m < 20) return 'medium';
+  return 'slow';
+}
+function timerLabel(ts) {
+  const m = Math.floor(elapsedMs(ts) / 60000);
+  const s = Math.floor((elapsedMs(ts) % 60000) / 1000);
+  return (m > 0 ? m + 'm ' : '') + s + 's';
+}
+
+function renderCard(order, stage) {
+  const foodItems = order.kitchenItems || [];
+  const isUrgent = elapsedMs(order.createdAt) > 20 * 60000; // 20+ min
+  const itemsHtml = foodItems.map(it => {
+    const m = Store.menuItem(it.menuId);
+    return `<div class="card-item">
+      <span class="item-emoji">${m ? m.emoji : ''}</span>
+      <span class="item-name">${it.name}</span>
+      <span class="item-qty">x${it.qty}</span>
+    </div>`;
+  }).join('');
+
+  let actions = '';
+  if (stage === 'incoming') {
+    actions = `<button class="btn-full btn-start" onclick="startCooking('${order.id}')">Start Cooking</button>
+               <button class="btn-full btn-cancel" onclick="cancelOrder('${order.id}')">Cancel</button>`;
+  } else if (stage === 'cooking') {
+    actions = `<button class="btn-full btn-done" onclick="markReady('${order.id}')">Mark Ready</button>`;
+  } else {
+    actions = `<button class="btn-full btn-cancel" onclick="markServed('${order.id}')">Served</button>`;
+  }
+
+  return `<div class="order-card${isUrgent ? ' urgent' : ''}" id="card-${order.id}">
+    <div class="card-top">
+      <span class="order-id">${order.id}</span>
+      <span class="table-tag">Table ${order.table || '?'}</span>
+      <span class="timer ${timerClass(order.createdAt)}" data-ts="${order.createdAt}">
+        ${timerLabel(order.createdAt)}
+      </span>
+    </div>
+    <div class="card-items">${itemsHtml || '<div style="color:#555;font-size:12px;padding:6px 0">No food items</div>'}</div>
+    ${order.note ? `<div class="card-note">${order.note}</div>` : ''}
+    <div class="card-actions">${actions}</div>
+  </div>`;
+}
+
+function startCooking(id) {
+  Audio.getCtx();
+  Store.updateOrder(id, { kitchenStatus: 'cooking' });
+  render();
+}
+function markReady(id) {
+  Audio.playDone();
+  Store.updateOrder(id, { kitchenStatus: 'ready', readyAt: Date.now() });
+  render();
+}
+function cancelOrder(id) {
+  if (confirm('Cancel this order?')) {
+    Store.updateOrder(id, { status: STATUS.CANCELLED });
+    render();
+  }
+}
+function markServed(id) {
+  Store.updateOrder(id, { kitchenStatus: 'served' });
+  render();
+}
+
+function render() {
+  const allOrders = Store.getOrders();
+  const today = allOrders.filter(o => {
+    const s = new Date(o.createdAt); s.setHours(0,0,0,0);
+    return s.getTime() === new Date().setHours(0,0,0,0);
+  });
+
+  // Check for new orders → notification
+  today.forEach(o => {
+    if (!knownOrders.has(o.id) && o.kitchenItems && o.kitchenItems.length > 0) {
+      knownOrders.add(o.id);
+      if (knownOrders.size > 1) { // skip on first load
+        if (soundEnabled) Audio.playNewOrder();
+        const banner = document.getElementById('notifBanner');
+        document.getElementById('notifText').textContent = `New order ${o.id} — Table ${o.table || '?'}`;
+        banner.classList.add('show');
+        setTimeout(() => banner.classList.remove('show'), 6000);
+      }
+    }
+  });
+  if (knownOrders.size === 0 && today.length > 0) {
+    today.forEach(o => knownOrders.add(o.id));
+  }
+
+  const foodOrders = today.filter(o =>
+    o.status !== STATUS.CANCELLED && o.kitchenItems && o.kitchenItems.length > 0
+  );
+
+  const incoming = foodOrders.filter(o => o.kitchenStatus === STATUS.KITCHEN || o.kitchenStatus === STATUS.PENDING);
+  const cooking  = foodOrders.filter(o => o.kitchenStatus === 'cooking');
+  const ready    = foodOrders.filter(o => o.kitchenStatus === 'ready' || o.kitchenStatus === 'served');
+  const doneToday = foodOrders.filter(o => o.kitchenStatus === 'ready' || o.kitchenStatus === 'served');
+
+  document.getElementById('cnt-incoming').textContent = incoming.length;
+  document.getElementById('cnt-cooking').textContent  = cooking.length;
+  document.getElementById('cnt-done').textContent     = ready.length;
+  document.getElementById('stat-active').textContent  = incoming.length + cooking.length;
+  document.getElementById('stat-done').textContent    = doneToday.length;
+
+  const colIn = document.getElementById('col-incoming');
+  const colCk = document.getElementById('col-cooking');
+  const colDn = document.getElementById('col-done');
+
+  colIn.innerHTML = incoming.length ? incoming.map(o => renderCard(o,'incoming')).join('') : '<div class="col-empty"><div class="icon">✓</div>No pending orders</div>';
+  colCk.innerHTML = cooking.length  ? cooking.map(o  => renderCard(o,'cooking')).join('') : '<div class="col-empty"><div class="icon">🍳</div>Nothing cooking</div>';
+  colDn.innerHTML = ready.length    ? ready.map(o    => renderCard(o,'done')).join('')    : '<div class="col-empty"><div class="icon">🔔</div>No ready orders</div>';
+}
+
+// Live timer update
+setInterval(() => {
+  document.querySelectorAll('.timer[data-ts]').forEach(el => {
+    const ts = parseInt(el.dataset.ts);
+    el.textContent = timerLabel(ts);
+    el.className = 'timer ' + timerClass(ts);
+  });
+}, 1000);
+
+// Real-time sync
+Store.onUpdate((msg) => {
+  if (['orders_updated','new_order','order_updated'].includes(msg.type)) render();
+});
+
+// Poll every 3s as fallback
+setInterval(render, 3000);
+render();
+</script>
+</body>
+</html>
